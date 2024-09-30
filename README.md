@@ -1,3 +1,6 @@
+
+![2024-09-29_22-13](https://github.com/user-attachments/assets/ba0d8b62-e13b-4a0a-8832-ce7007285237)
+
 # Planetas
 This project is a space simulator developed in C++ using the Raylib library. The goal is to create a realistic representation of the solar system and space in general, where users can explore different planets and understand their dynamics in a 3D environment.
 
