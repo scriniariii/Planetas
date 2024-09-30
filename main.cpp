@@ -1,65 +1,135 @@
 #include "raylib.h"
+#include "raymath.h"
+#include <vector>
 
-int main() {
-    // Inicializamos la ventana
-    InitWindow(1250, 680, "Planetasd");
+// Clase para la cámara
+class CameraController {
+public:
+    Camera3D camera;
 
-    
-    
-
-    // Definimos una cámara
-    Camera3D camera = { 0 };
-    camera.position = Vector3{ 4.0f, 4.0f, 4.0f };
-    camera.target = Vector3{ 0.0f, 0.0f, 0.0f };
-    camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
-    camera.fovy = 45.0f;
-    camera.projection = CAMERA_PERSPECTIVE;
-
-    // Cargar la textura del fondo
-   // Texture2D background = LoadTexture("resources/space_background.png");
-
-    // Cargar la textura para el planeta
-    Texture2D texture = LoadTexture("resources/planeta.png");
-    if (!texture.id) {
-        TraceLog(LOG_ERROR, "No se pudo cargar la textura.");
+    CameraController(Vector3 position, Vector3 target) {
+        camera.position = position;
+        camera.target = target;
+        camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
+        camera.fovy = 45.0f;
+        camera.projection = CAMERA_PERSPECTIVE;
     }
 
-    // Modelo de la esfera
-    Mesh sphereMesh = GenMeshSphere(1.0f, 10, 10);
-    Model sphereModel = LoadModelFromMesh(sphereMesh);
-    sphereModel.materials[0].maps[MATERIAL_MAP_ALBEDO].texture = texture;
+    void Update() {
+        UpdateCamera(&camera, CAMERA_THIRD_PERSON);  // Actualiza la cámara en tercera persona
+    }
 
-    SetTargetFPS(60);
-
-    while (!WindowShouldClose()) {
-
-        if (IsKeyPressed(KEY_F)){
-            ToggleFullscreen(); 
+    void ToggleFullScreen() {
+        if (IsKeyPressed(KEY_F)) {
+            ToggleFullscreen();
         }
-        
+    }
+};
 
-        // Actualizar la cámara
-        UpdateCamera(&camera, CAMERA_THIRD_PERSON);
+// Clase para los planetas
+class Planet {
+public:
+    Model model;
+    Texture2D texture;
+    float rotationSpeed;
+    float rotationAngle;
+    Vector3 position;  // Nueva propiedad para almacenar la posición del planeta
 
-        BeginDrawing();
-        Color myColor = {52, 73, 94, 255};
-        ClearBackground(myColor );
+    Planet(const char* texturePath, float speed, Vector3 pos) {
+        // Cargar la textura
+        texture = LoadTexture(texturePath);
+        if (!texture.id) {
+            TraceLog(LOG_ERROR, "No se pudo cargar la textura.");
+        }
 
-        // Iniciar modo 3D
-        BeginMode3D(camera);
+        // Generar la esfera
+        Mesh sphereMesh = GenMeshSphere(1.0f, 10, 10);
+        model = LoadModelFromMesh(sphereMesh);
+        model.materials[0].maps[MATERIAL_MAP_ALBEDO].texture = texture;
 
-        // Dibujar el modelo de la esfera
-        DrawModel(sphereModel, Vector3{ 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
-
-        EndMode3D();  // Terminar modo 3D
-
-        EndDrawing();  // Terminar dibujo
+        // Velocidad y ángulo de rotación inicial
+        rotationSpeed = speed;
+        rotationAngle = 0.0f;
+        position = pos;  // Asignar la posición del planeta
     }
 
-    // Liberar recursos
-    UnloadTexture(texture);
-    UnloadModel(sphereModel);
-    CloseWindow();
+    void Update() {
+        // Actualizar la rotación
+        rotationAngle += rotationSpeed;
+        model.transform = MatrixIdentity();
+        Matrix rotationMatrix = MatrixRotate(Vector3{ 0.0f, 1.0f, 0.0f }, rotationAngle);
+        model.transform = MatrixMultiply(model.transform, rotationMatrix);
+    }
+
+    void Draw() {
+        // Dibujar el modelo en la posición especificada
+        DrawModel(model, position, 1.0f, WHITE);
+    }
+
+    void Unload() {
+        UnloadTexture(texture);
+        UnloadModel(model);
+    }
+};
+
+// Clase para gestionar el juego (ventana, loop principal)
+class Game {
+public:
+    CameraController camera;
+    std::vector<Planet> planets;
+
+    Game() : camera(Vector3{ 4.0f, 4.0f, 4.0f }, Vector3{ 0.0f, 0.0f, 0.0f }) {
+        InitWindow(1250, 680, "Planetasd");
+        SetTargetFPS(30);
+
+        // Crear planetas con posiciones diferentes
+        planets.push_back(Planet("resources/planeta.png", 0.01f, Vector3{ 0.0f, 0.0f, 0.0f }));
+        planets.push_back(Planet("resources/planeta.png", 0.005f, Vector3{ 3.0f, 0.0f, 0.0f }));  // Nuevo planeta en otra posición
+        planets.push_back(Planet("resources/planeta.png", 0.02f, Vector3{ -3.0f, 0.0f, 0.0f })); // Otro planeta en el lado opuesto
+    }
+
+    void Run() {
+        while (!WindowShouldClose()) {
+            Update();
+            Draw();
+        }
+    }
+
+    void Update() {
+        camera.Update();
+        camera.ToggleFullScreen();
+
+        // Actualizar todos los planetas
+        for (Planet& planet : planets) {
+            planet.Update();
+        }
+    }
+
+    void Draw() {
+        BeginDrawing();
+        ClearBackground(Color{ 52, 73, 94, 255 });
+
+        BeginMode3D(camera.camera);
+        for (Planet& planet : planets) {
+            planet.Draw();
+        }
+        EndMode3D();
+
+        EndDrawing();
+    }
+
+    ~Game() {
+        for (Planet& planet : planets) {
+            planet.Unload();
+        }
+        CloseWindow();
+    }
+};
+
+// Función principal
+int main() {
+    Game game;
+    game.Run();
 
     return 0;
 }
